@@ -25,6 +25,7 @@
     //Проверка существования login
         $query = mysql_query('SELECT user_id, id_session, role, username, IP, date_last_login, blocking FROM users WHERE login="'.$_SESSION['login'].'"', $connection);                
         $res = mysql_fetch_array($query, MYSQL_ASSOC);
+        //Если заблокирован выходим
         if ($res['blocking'] == 1){
              unset($_SESSION['login']);
              unset($_SESSION['session']);
