@@ -29,6 +29,8 @@
              unset($_SESSION['login']);
              unset($_SESSION['session']);
              session_destroy();
+             Header("Location: index.php");
+             die();
         }
     }
     //Существует ли такой login и актуален ли идентификатор сессии 
