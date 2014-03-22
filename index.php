@@ -5,7 +5,11 @@ include 'connect.php';
 
 //редирект если уже залогинены и не заблокированы
 if (isset($_SESSION['login']) && isset($_SESSION['session'])){
-   $query = mysql_query('SELECT id_session, blocking FROM users WHERE login="'.$_SESSION['login'].'"', $connection);                
+    //Проверить
+   $query = mysql_query('SELECT id_session, blocking FROM users
+       INNER JOIN entrance ON user_id = id_user 
+       WHERE login="'.$_SESSION['login'].'" AND 
+           entrance.IP="'.$_SERVER['REMOTE_ADDR'].'"', $connection);                
    $res = mysql_fetch_array($query, MYSQL_ASSOC);
    if ($res['id_session'] == $_SESSION['session']){
        if ($res['blocking'] == 0){ 
@@ -36,33 +40,46 @@ $login_submit = $_POST['submit'];
             if (strlen($password) > 25  || strlen($password) < 6){
                 $error['pas_no_suitable'] = 'Password must be between 6 or 25 characters!';
             }         
-            $re = '/^[a-zA-Z0-9\_]{1}[a-zA-Z0-9\_]{5,24}$/'; 
+            $re = '/^[a-zA-Z0-9\_]{1}[a-zA-Z0-9\_\!\@\#\$\%\^\&\*\(\)\-\+\=\;\:\,\.\/\?\\\|\`\~\[\]\{\}]{5,24}$/';
             if (!preg_match($re, $password)){
                 $error['password_incorrect'] = 'You can use only alphanumeric characters and the underscore for password!';
             }
             
-            if (!$error){                
-                $query = mysql_query('SELECT user_id, login, password, salt, blocking FROM users WHERE login="'.$login.'"', $connection);                
-                $res = mysql_fetch_array($query, MYSQL_ASSOC);
-                if ($res){
-                    if ($res['blocking'] == 0){
+            if (!$error){    
+                //ПРоверяем существует ли пользователь.                                
+                if (mysql_num_rows(mysql_query('SELECT user_id FROM users WHERE login="'.$login.'"',$connection)) != 0){
+                    
+                    $query = mysql_query('SELECT user_id, password, salt FROM users WHERE login="'.$login.'"', $connection);                
+                    $res = mysql_fetch_array($query, MYSQL_ASSOC);
+                    //Вытаскиваем блокировку отдельно т.к. при первом входе ее может еще не быть для данного IP
+                    $query1= mysql_query('SELECT failed_attempts, blocking FROM entrance WHERE id_user="'.$res['user_id'].'" AND IP="'.$_SERVER['REMOTE_ADDR'].'"',$connection);
+                    if ($query1)
+                        $res1 = mysql_fetch_array($query1, MYSQLI_ASSOC);
+                    if (!$res1){
+                        mysql_query("INSERT INTO entrance VALUES('', '".$res['user_id']."', '".$_SERVER['REMOTE_ADDR']."','0','0')",$connection);
+                        $res1['failed_attempts'] = 0;
+                        $res1['blocking'] = 0;
+                    }
+                    if ($res1['blocking'] == 0){
+                        if (($res['password'] == sha1($password.$res['salt']))){                        
                         //Логинимся
-                        if (($res['password'] == sha1($password.$res['salt']))){                                                       
                             $_SESSION['session'] = sha1(random_string(40));
                             $_SESSION['login'] = $login;                            
                             mysql_query('UPDATE users SET id_session="'.$_SESSION['session'].'" WHERE login="'.$login.'"', $connection);                                                                                                    
                             Header("Location: login.php");
                             die();
                         }else{                            
-                            $query = mysql_query('SELECT failed_attempts FROM entrance WHERE id_user="'.$res['user_id'].'"', $connection);
-                            $res1 = mysql_fetch_array($query, MYSQL_ASSOC);
-                            $res1['failed_attempts'] = $res1['failed_attempts']+1;
-                            //Блокируем пользователя или наращиваем счетчик
-                            if ($res1['failed_attempts'] > $ban_num){
-                                mysql_query('UPDATE users SET blocking="1" WHERE login="'.$login.'"', $connection);
-                            }else{
-                                mysql_query('UPDATE entrance SET IP="'.$_SERVER['REMOTE_ADDR'].'", failed_attempts='.$res1['failed_attempts'].' WHERE id_user="'.$res['user_id'].'"', $connection);
-                            }
+                            $query = mysql_query('SELECT id, failed_attempts, blocking FROM entrance WHERE id_user="'.$res['user_id'].'" AND IP="'.$_SERVER['REMOTE_ADDR'].'"',
+                                    $connection);
+                            $res = mysql_fetch_assoc($query);
+                            if ($res['blocking'] == 0){
+                               $res['failed_attempts'] =$res['failed_attempts']+1;
+                               if ($res['failed_attempts'] > $ban_num){
+                                   mysql_query('UPDATE entrance SET blocking="1" WHERE id="'.$res['id'].'"',$connection);
+                               }else{
+                                   mysql_query('UPDATE entrance SET failed_attempts="'.($res['failed_attempts']).'" WHERE id="'.$res['id'].'"',$connection);                                
+                               }
+                            }                            
                             $error['aut_failed'] = 'Autentifcation failed!';
                         }                
                     }else{

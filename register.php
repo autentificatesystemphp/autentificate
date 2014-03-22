@@ -47,10 +47,7 @@ include 'connect.php';
             if (!preg_match($re, $login)){
                 $error['login_incorrect'] = 'You can use only alphanumeric characters and the underscore for login!';
             }
-            
-            
-            
-            
+                                                
             //Проверка email            
             $re = '/^\w+([\.\w]+)*\w@\w((\.\w)*\w+)*\.\w{2,3}$/'; 
             if (!preg_match($re, $email)){
@@ -64,38 +61,27 @@ include 'connect.php';
             if (strlen($password) > 25  || strlen($password) < 6){
                 $error['pas_no_suitable'] = 'Password must be between 6 or 25 characters!';
             }         
-            $re = '/^[a-zA-Z0-9\_]{1}[a-zA-Z0-9\_]{5,24}$/'; 
+            $re = '/^[a-zA-Z0-9\_]{1}[a-zA-Z0-9\_\!\@\#\$\%\^\&\*\(\)\-\+\=\;\:\,\.\/\?\\\|\`\~\[\]\{\}]{5,24}$/'; 
             if (!preg_match($re, $password)){
                 $error['password_incorrect'] = 'You can use only alphanumeric characters and the underscore for password!';
             }
             $salt = random_string(15);
-            $password = sha1($password.$salt);
-            $passwordrepeat = sha1($passwordrepeat.$salt);            
-                        
+            $password = sha1($password.$salt);                       
+                                    
             
-            
-            //проверка занятости логина
-            $login_check = mysql_query("
+            //проверка занятости логина                       
+            if (mysql_num_rows(mysql_query("
                 SELECT login FROM users WHERE login='$login'
-            ",$connection);
-            $count = mysql_num_rows($login_check);
-            if ($count != 0){
+            ",$connection)) != 0){
                 $error['login_taken'] = 'This login is already taken!';
             }
             
              
             //регистрация пользователя 
             if (!$error){
-                $query = mysql_query("
-                    INSERT INTO users VALUES ('','$username','$login','$password','$salt','','','$email','','','')
-                ",$connection); 
-                $query = mysql_query("
-                    SELECT user_id FROM users WHERE login='$login'
-                ",$connection);
-                $res = mysql_fetch_array($query, MYSQL_ASSOC);
                 mysql_query("
-                    INSERT INTO entrance VALUES ('".$res['user_id']."','','')
-                ",$connection);                
+                    INSERT INTO users VALUES ('','$username','$login','$password','$salt','','','$email','','')
+                ",$connection);                               
                 echo "<h2>You are successfully registered! Go to <a href='index.php'>login page</a></h2>";
                 return;
             }

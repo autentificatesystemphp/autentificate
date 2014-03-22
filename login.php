@@ -4,7 +4,8 @@
     function logout($connection){
         $date = date('Y-m-d');
         $ip = $_SERVER['REMOTE_ADDR'];
-        mysql_query('UPDATE users SET IP="'.$ip.'", date_last_login="'.$date.'" WHERE login="'.$_SESSION['login'].'"', $connection);
+        mysql_query('UPDATE users SET IP="'.$ip.'", date_last_login="'.$date.'"
+            WHERE login="'.$_SESSION['login'].'"', $connection);
         unset($_SESSION['login']);
         unset($_SESSION['session']);
         session_destroy();
@@ -21,10 +22,12 @@
         $error['login_incorrect'] = 'You can use only alphanumeric characters and the underscore for login!';
     }
     
-    if (!isset($error)){
-    //Проверка существования login
-        $query = mysql_query('SELECT user_id, id_session, role, username, IP, date_last_login, blocking FROM users WHERE login="'.$_SESSION['login'].'"', $connection);                
-        $res = mysql_fetch_array($query, MYSQL_ASSOC);
+    if (!isset($error)){    
+        $query = mysql_query('SELECT user_id FROM users WHERE login="'.$_SESSION['login'].'"',$connection);
+        $res= mysql_fetch_assoc($query);
+        $query = mysql_query('SELECT blocking FROM entrance 
+            WHERE id_user="'.$res['user_id'].'" AND IP="'.$_SERVER['REMOTE_ADDR'].'"',$connection);
+        $res = mysql_fetch_assoc($query);
         //Если заблокирован выходим
         if ($res['blocking'] == 1){
              unset($_SESSION['login']);
@@ -33,6 +36,9 @@
              Header("Location: index.php");
              die();
         }
+        $query = mysql_query('SELECT user_id, id_session, role, username, IP, date_last_login
+             FROM users WHERE login="'.$_SESSION['login'].'"', $connection);                
+        $res = mysql_fetch_array($query, MYSQL_ASSOC);
     }
     //Существует ли такой login и актуален ли идентификатор сессии 
     if (isset($res) && $res['id_session'] == $_SESSION['session']){
@@ -41,6 +47,7 @@
         if (isset($_POST['logout'])){
             logout($connection);
         }
+        
         $date = date('Y-m-d');
         $role = $res['role'];
         $query1 = mysql_query('SELECT role FROM role WHERE id_role="'.$role.'"', $connection);                
@@ -55,10 +62,12 @@
                 
                 $query2 = mysql_query('SELECT login FROM users', $connection);                
                 while($res2 = mysql_fetch_array($query2, MYSQL_ASSOC)){                                        
-                    mysql_query('UPDATE users SET role="'.$roles[$_POST[$res2['login']]].'" WHERE login="'.$res2['login'].'"', $connection);
+                    mysql_query('UPDATE users SET role="'.$roles[$_POST[$res2['login']]].'" 
+                        WHERE login="'.$res2['login'].'"', $connection);
                 }
                 
-                $query = mysql_query('SELECT user_id, id_session, role, username, IP, date_last_login FROM users WHERE login="'.$_SESSION['login'].'"', $connection);                
+                $query = mysql_query('SELECT user_id, id_session, role, username, IP, date_last_login 
+                    FROM users WHERE login="'.$_SESSION['login'].'"', $connection);                
                 $res = mysql_fetch_array($query, MYSQL_ASSOC);
                 $role = $res['role'];
                 $query1 = mysql_query('SELECT role FROM role WHERE id_role="'.$role.'"', $connection);                
@@ -69,21 +78,18 @@
             //нажали на кнопку сохранить попытки
             if (isset($_POST['save_attempts'])){
                 $re = '/^[0-9]{1,11}$/';
-                $query2 = mysql_query('SELECT id_user FROM entrance',$connection);
+                $query2 = mysql_query('SELECT id FROM entrance',$connection);
                 while($res2 = mysql_fetch_array($query2, MYSQL_ASSOC)){
-                    if (!preg_match($re,$_POST[$res2['id_user']])){
+                    if (!preg_match($re,$_POST[$res2['id']])){
                         $error['attempts_incorrect'] = 'Attempts incorrect!';
                     }
                     if (!isset($error)){
-                        $attempt = $_POST[$res2['id_user']];
-                        if ($attempt == 0){
-                            mysql_query('UPDATE entrance SET IP=NULL WHERE id_user="'.$res2['id_user'].'"',$connection);
-                        }
-                        mysql_query('UPDATE entrance SET failed_attempts="'.$attempt.'" WHERE id_user="'.$res2['id_user'].'"',$connection);
+                        $attempt = $_POST[$res2['id']];                        
+                        mysql_query('UPDATE entrance SET failed_attempts="'.$attempt.'" WHERE id="'.$res2['id'].'"',$connection);
                         if ($attempt <= $ban_num){
-                            mysql_query('UPDATE users SET blocking=0 WHERE user_id="'.$res2['id_user'].'"',$connection);
+                            mysql_query('UPDATE entrance SET blocking=0 WHERE id="'.$res2['id'].'"',$connection);
                         }else{
-                            mysql_query('UPDATE users SET blocking=1 WHERE user_id="'.$res2['id_user'].'"',$connection);
+                            mysql_query('UPDATE entrance SET blocking=1 WHERE id="'.$res2['id'].'"',$connection);
                         }
                         
                     }
@@ -217,7 +223,10 @@
                     </tr>
                 </thead>';
         echo '<form role="form" action="./login.php" method="POST">';
-        $query1 = mysql_query('SELECT id_user, entrance.IP, failed_attempts, login FROM entrance JOIN users ON id_user=user_id', $connection);
+        $query1 = mysql_query('SELECT id, id_user, entrance.IP, failed_attempts, login 
+                                FROM entrance 
+                                JOIN users ON id_user=user_id 
+                                ORDER BY login', $connection);
         while($res1 = mysql_fetch_array($query1,MYSQL_ASSOC)){
             echo '<tr>';
                         echo '<td>'.$i.'</td>';
@@ -225,7 +234,7 @@
                         echo '<td>'.$res1['login'].'</td>';
                         echo '<td>'.$res1['IP'].'</td>'; 
                         echo '<td>                             
-                                <input type="text" class="form-control" name="'.$res1['id_user'].'" value="'.$res1['failed_attempts'].'">
+                                <input type="text" class="form-control" name="'.$res1['id'].'" value="'.$res1['failed_attempts'].'">
                            </td>';
                         $i = $i+1;
             echo '</tr>';
