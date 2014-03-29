@@ -66,6 +66,7 @@ $login_submit = $_POST['submit'];
                             $_SESSION['session'] = sha1(random_string(40));
                             $_SESSION['login'] = $login;                            
                             mysql_query('UPDATE users SET id_session="'.$_SESSION['session'].'" WHERE login="'.$login.'"', $connection);                                                                                                    
+                            mysql_query('UPDATE entrance SET failed_attempts="0" WHERE id_user="'.$res['user_id'].'" AND IP="'.$_SERVER['REMOTE_ADDR'].'"',$connection);
                             Header("Location: login.php");
                             die();
                         }else{                            
